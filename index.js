@@ -1,34 +1,36 @@
-const express = require('express');
-const app = express();
+require('dotenv').config()
 
-const hmacSHA512 = require('crypto-js/hmac-sha512');
-const Base64 = require('crypto-js/enc-base64');
-const Utf8 = require('crypto-js/enc-utf8');
+var express = require("express");
+var app = express();
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
 
-function keyGenerator(timestamp, method, uri, contentType, device, authKey) {
-    let rawRequestX = `${method}\n${contentType || ""}\n${timestamp}\n${uri}`;
+/*******
+ *  activate the middleware/dependencies above on our server
+ *      morgan: logger
+ *      helmet: secure the response header
+ *      cors: let the sites available to be accessed by external entity
+ *      body-parser: to parse the x-form-urlencoded
+ * 
+ *******/
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms')) // let developer able to see what happens
+app.use(helmet()); // securing express header so less vulnerable to security breach
+app.use(cors({
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: '*',
+    methods: '*',
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+}));
 
-    rawRequest = hmacSHA512(rawRequestX, authKey);
-
-    let generatedToken = Base64.stringify(rawRequest);
-    generatedToken = Utf8.parse(device + ':' + generatedToken);
-    generatedToken = Base64.stringify(generatedToken);
-    return {
-        "X-Auth-Key": generatedToken,
-        "X-Auth-Time": timestamp,
-        rawRequest: rawRequestX,
-        authKey: authKey
-    }
-};
-
-
-app.get("/generate-token", (req, res) => {
-    const x = keyGenerator(Math.floor(new Date() / 1000), req.query.method, req.query.uri, req.query.content_type, req.query.device, req.query.authkey)
-
-    return res.status(200).json(x)
-});
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 
-server = app.listen(4000, function () {
+app.use('/', require('./routes'))
+
+app.listen(process.env.PORT || 4000, function () {
     console.log(`Server is running on port ${this.address().port} in ${app.settings.env} mode`);
-});
+})
